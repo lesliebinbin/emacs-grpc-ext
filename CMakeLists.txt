@@ -33,7 +33,7 @@ add_library(emacs-rpc-bridge MODULE
   src/handles.cpp)
 target_include_directories(emacs-rpc-bridge PRIVATE "${EMACS_MODULE_INCLUDE_DIR}")
 target_compile_options(emacs-rpc-bridge PRIVATE -Wall -Wextra)
-# gRPC / protobuf / absl are static (installed into $HOME/local), so this
+# gRPC / protobuf / absl are static (vcpkg x64-linux triplet), so this
 # dlopened MODULE pulls them in and must link position-independently.
 target_link_libraries(emacs-rpc-bridge PRIVATE rpc_bridge_proto
                       Threads::Threads)
@@ -52,11 +52,12 @@ install(TARGETS emacs-rpc-bridge
 # Protocol bindings + codegen smoke (milestone 2: define the protocol
 # contract, generate bindings, validate the toolchain).
 #
-# Toolchain: gRPC v1.83.1 (protobuf 35.1, boringssl module provider) built
-# from source into /home/lesliebinbinhuang/local; that prefix is supplied to
-# find_package via CMAKE_PREFIX_PATH in CMakePresets.json.  If configure
-# fails to find gRPC here, re-check the preset path before installing
-# anything else — no silent dependency downloads.
+# Toolchain: dependencies are managed by vcpkg in manifest mode -- vcpkg.json
+# declares gRPC and protobuf, and CMakePresets.json points configure at vcpkg's
+# toolchain file ($env{VCPKG_ROOT}), which installs them into
+# build/vcpkg_installed (static x64-linux).  If configure fails to find gRPC
+# here, re-check VCPKG_ROOT and vcpkg.json before installing anything else --
+# no silent dependency downloads.
 # ---------------------------------------------------------------------------
 # protobuf FIRST: gRPC's exported targets reference protobuf::libprotobuf and
 # protobuf::libprotoc, so protobuf's config must be loaded before gRPC's.

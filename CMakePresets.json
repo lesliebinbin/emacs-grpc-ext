@@ -9,11 +9,11 @@
     {
       "name": "default",
       "displayName": "Default (Debug)",
-      "description": "Configure into build/ with a Debug build type, like the mise 'configure' task",
+      "description": "Configure into build/ with a Debug build type, like the mise 'configure' task; dependencies come from vcpkg (vcpkg.json manifest) via its toolchain file",
       "binaryDir": "${sourceDir}/build",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_PREFIX_PATH": "/home/lesliebinbinhuang/local"
+        "CMAKE_TOOLCHAIN_FILE": "$env{VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake"
       }
     }
   ],

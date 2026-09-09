@@ -1,8 +1,17 @@
-# CMake, a C++20 compiler, and an Emacs built with native module support are
-# external prerequisites (see README.org); this file only drives them.
+# A C++20 compiler and an Emacs built with native module support are external
+# prerequisites (see README.org); this file only drives CMake.
+#
+# Dependencies (gRPC/protobuf) are not managed by mise -- vcpkg cannot be a
+# mise tool (it ships no binaries).  They are declared in vcpkg.json and CMake
+# itself wires them: CMakePresets.json points configure at vcpkg's toolchain
+# file ($env{VCPKG_ROOT}, exported by the shell) and the manifest deps land
+# in build/vcpkg_installed.
+
+[tools]
+cmake = "latest"
 
 [tasks.configure]
-description = "Configure the CMake build directory (via CMakePresets.json, which sets CMAKE_PREFIX_PATH for the gRPC toolchain)"
+description = "Configure the CMake build directory (via CMakePresets.json)"
 run = "cmake --preset default"
 
 [tasks.build]

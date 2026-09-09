@@ -28,14 +28,19 @@ module load, no retries of side-effecting calls.
 
 - Emacs 31.1 with native module support and the matching =emacs-module.h=
 - CMake 3.21+ (presets), C++20 compiler
-- gRPC + protobuf installed explicitly (no silent downloads) in
-  =$HOME/local=, supplied through =CMAKE_PREFIX_PATH= in
-  =CMakePresets.json=
+- A =vcpkg= checkout with =VCPKG_ROOT= exported.  Dependencies are declared
+  explicitly in =vcpkg.json= (no silent downloads); =CMakePresets.json=
+  points configure at vcpkg's toolchain file, which installs them into
+  =build/vcpkg_installed= on the first configure
 
 * Build and check
 
+The preset expands =$env{VCPKG_ROOT}= at configure time, so export it first;
+the first configure builds the dependencies and takes a while.  (=mise run
+configure= is the same command under this repo's =mise.toml=.)
+
 #+begin_src shell
-cmake --preset default            # configure into build/
+cmake --preset default            # configure into build/ (first run: vcpkg builds deps)
 cmake --build build               # module -> build/libemacs-rpc-bridge.so
 ctest --test-dir build            # codegen_smoke + integration_test
 #+end_src
