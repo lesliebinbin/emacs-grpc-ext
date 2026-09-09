@@ -20,9 +20,9 @@ module load, no retries of side-effecting calls.
   drain timer, the Lisp helpers the native dispatch funcalls
 - =tests/= — =codegen_smoke=, the C++ integration harness
   (=integration_test.cpp= + =emacs_bridge_server.el=), both run by =ctest=
-- Independent Python consumer + runtime acceptance suite (design TODO 5):
-  =~/codings/emacs-rpc-py-client-test= (uv-managed; generates its own stubs
-  from =proto/emacs_rpc.proto=)
+- Nothing language-specific is checked in here; the "Python client"
+  section below builds a small consumer from the schema alone, with =uv=,
+  and it doubles as the design-TODO-5 runtime acceptance example.
 
 * Requirements
 
@@ -95,21 +95,119 @@ The registered native functions are =emacs-rpc-bridge-native-start/drain/
 stop/running-p/last-error=; use the adapter, not the natives, in an
 interactive Emacs.  =emacs-rpc-bridge-stop= is on =kill-emacs-hook=.
 
-* Python client (first independent consumer)
+* Python client (a minimal consumer)
 
-See =~/codings/emacs-rpc-py-client-test/= (design-001.org TODO 5).
-Run its runtime acceptance suite from there:
+The bridge is language-neutral: any gRPC client works.  This section
+builds a small Python consumer from scratch with =uv= -- no repository
+paths, nothing but the shared schema.  It assumes an Emacs already
+running the bridge (Load into Emacs above).
+
+** 1. Dependencies
 
 #+begin_src shell
-uv sync
-uv run python tests/run_all.py   # 51 checks against emacs -Q --batch
+uv add grpcio grpcio-tools     # inside your uv project
 #+end_src
 
-The suite doubles as the documented client API examples: =ErpcClient=
-(socket) opens a session at construction; =call(name, *values)= reads like
-funcall; compound results come back as =Handle=; =with_buffer(handle)=
-runs calls under save-current-buffer; Lisp signals raise =LispError= with
-the signal symbol.
+** 2. Copy the wire schema
+
+=proto/emacs_rpc.proto= is the single source of truth -- the client
+compiles the very file the server speaks, so the two can never drift.
+Copy it into your project (and re-copy when this repository updates it):
+
+#+begin_src shell
+mkdir -p proto
+cp <path-to-this-repo>/proto/emacs_rpc.proto proto/
+#+end_src
+
+** 3. Generate the client stubs
+
+#+begin_src shell
+uv run python -m grpc_tools.protoc -I proto \
+    --python_out=. --grpc_python_out=. proto/emacs_rpc.proto
+#+end_src
+
+This produces =emacs_rpc_pb2.py= (the messages) and
+=emacs_rpc_pb2_grpc.py= (the service).  Commit both.
+
+** 4. Wrap the wire into a natural call shape
+
+The wire is envelope-based (=session_id=, =correlation_id=, =CallOp=):
+gRPC has no sessions of its own, so every client negotiates one first
+with =OpenSession=, and a "natural" call cannot be expressed directly in
+the proto -- the wrapper hides that plumbing so a call reads as function
+name + values (like Lisp's =funcall=).
+
+#+begin_src python
+"""demo.py -- talk to the Emacs bridge over its Unix socket."""
+import grpc
+import emacs_rpc_pb2 as pb
+import emacs_rpc_pb2_grpc as api
+
+def to_value(v):
+    value = pb.Value()
+    if v is None or v is False:
+        value.nil_value = True
+    elif v is True:
+        value.true_value = True
+    elif isinstance(v, int):
+        value.integer = v
+    elif isinstance(v, float):
+        value.real = v
+    elif isinstance(v, str):
+        value.text = v
+    else:
+        raise TypeError(f"cannot send {type(v).__name__} over the bridge")
+    return value
+
+def from_value(v):
+    kind = v.WhichOneof("kind")
+    if kind == "integer":
+        return v.integer
+    if kind == "real":
+        return v.real
+    if kind == "text":
+        return v.text
+    if kind == "true_value":
+        return True
+    return None                    # nil and anything unmapped
+
+class Emacs:
+    """One session; call(name, *values) reads like funcall."""
+
+    def __init__(self, socket):
+        self._stub = api.EmacsRpcStub(grpc.insecure_channel("unix:" + socket))
+        self._session = self._stub.OpenSession(
+            pb.OpenSessionRequest(protocol_version=1)).session_id
+
+    def call(self, name, *values):
+        req = pb.CallRequest(session_id=self._session,
+                             op=pb.CallOp(function_name=name))
+        req.op.arguments.extend(to_value(v) for v in values)
+        resp = self._stub.Call(req)
+        if resp.HasField("error"):           # a Lisp signal, not a crash
+            raise RuntimeError(f"{resp.error.symbol}: {resp.error.message}")
+        return from_value(resp.value)
+#+end_src
+
+** 5. Initiate and call
+
+#+begin_src python
+# In the running Emacs:
+#   (emacs-rpc-bridge-start)               -- or via (require 'grpc-bridge)
+#   (emacs-rpc-bridge--socket-file)        -- the value goes in SOCKET below
+# (default on Linux with XDG_RUNTIME_DIR: /run/user/<uid>/emacs-rpc-bridge-<uid>.sock)
+
+emacs = Emacs(SOCKET)
+emacs.call("+", 1, 2)                # -> 3
+emacs.call("concat", "hel", "lo")    # -> "hello"
+#+end_src
+
+Scalar mapping: =None/bool <-> nil/t=, =int/float/str= as-is (=bytes= as
+unibyte).  Lisp objects other than scalars and symbols come back as
+opaque session-scoped =handle= ids and are consumed through
+=WithBuffer=/=ReleaseHandles= (see the proto); Lisp signals arrive as
+structured errors (oneof =value|error=), transport problems as ordinary
+gRPC statuses.
 
 * Anatomy of =src/module.cpp=
 
