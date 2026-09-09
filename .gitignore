@@ -1,2 +1,4 @@
 # CMake build output
 build/
+# Byte-compiled elisp (package installs compile in their own tree)
+*.elc

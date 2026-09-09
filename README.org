@@ -46,6 +46,31 @@ runs), then drives every scenario over the real socket.
 
 * Load into Emacs (the adapter)
 
+** As an installed package (Spacemacs additional packages)
+
+This repository installs as the package =grpc-bridge= (main file
+=grpc-bridge.el= at the repository root, mirroring how emacs-jupyter-eval
+packages =jupyter-eval=):
+
+#+begin_src elisp
+;; .spacemacs.d/emacs-config/layers.el, dotspacemacs-additional-packages:
+(grpc-bridge :location (recipe :fetcher github-ssh
+               :repo "lesliebinbin/emacs-grpc-ext" :files ("*")))
+#+end_src
+
+A package install delivers the elisp only -- the native module (C++/gRPC)
+is not shipped as elisp.  On first =require=, =grpc-bridge.el= checks for
+=build/libemacs-rpc-bridge.so= next to it and offers to build it in place
+with =mise build= (in noninteractive runs it prints the command instead).
+The build needs the gRPC toolchain of the Requirements section.
+
+#+begin_src elisp
+(require 'grpc-bridge)      ; first require offers `mise build' if needed
+(emacs-rpc-bridge-start)    ; explicit start; loading never starts it
+#+end_src
+
+** From a source checkout
+
 #+begin_src elisp
 (require 'emacs-rpc-bridge)   ; from lisp/emacs-rpc-bridge.el
 (emacs-rpc-bridge-start)      ; explicit start; loading never starts it
