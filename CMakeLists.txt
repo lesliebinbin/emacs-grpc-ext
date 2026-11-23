@@ -26,17 +26,22 @@ endif()
 # needs no link dependency of its own (per runbook/emacs-rpc-bridge/design-001).
 find_package(Threads REQUIRED)
 
+add_library(emacs_module_headers INTERFACE)
+target_include_directories(emacs_module_headers SYSTEM INTERFACE
+  "${EMACS_MODULE_INCLUDE_DIR}")
+
 add_library(emacs-rpc-bridge MODULE
   src/module.cpp
   src/server.cpp
   src/dispatch.cpp
   src/handles.cpp)
-target_include_directories(emacs-rpc-bridge PRIVATE "${EMACS_MODULE_INCLUDE_DIR}")
 target_compile_options(emacs-rpc-bridge PRIVATE -Wall -Wextra)
 # gRPC / protobuf / absl are static (vcpkg x64-linux triplet), so this
 # dlopened MODULE pulls them in and must link position-independently.
+# Link emacs_module_headers AFTER rpc_bridge_proto so a system include dir
+# (e.g. /opt/homebrew/include or /usr/include) cannot shadow vcpkg headers.
 target_link_libraries(emacs-rpc-bridge PRIVATE rpc_bridge_proto
-                      Threads::Threads)
+                      Threads::Threads emacs_module_headers)
 
 # Emacs has no install convention of its own.  Either load the built file
 # directly (build/libemacs-rpc-bridge.so) with module-load, or install it
