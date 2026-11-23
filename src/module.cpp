@@ -294,7 +294,7 @@ emacs_value make_fun(emacs_env *env, int min, int max,
 // plugin_is_GPL_compatible).  Emacs calls it once when module-load succeeds;
 // returning nonzero aborts the load.
 
-extern "C" int emacs_module_init(struct emacs_runtime *ert) {
+extern "C" int emacs_module_init(struct emacs_runtime *ert) noexcept {
   emacs_env *env = ert->get_environment(ert);
 
   // make_function(env, min-args, max-args, callback, docstring, user-data)
