@@ -145,7 +145,7 @@ subdirectory of the temporary directory, chmod 700."
     (if (and dir (file-directory-p dir))
         (expand-file-name (format "emacs-rpc-bridge-%s.sock" (user-uid)) dir)
       (let ((private (expand-file-name "emacs-rpc-bridge"
-                                       (file-temporary-directory))))
+                                       (temporary-file-directory))))
         (make-directory private t)
         (set-file-modes private #o700)
         (expand-file-name (format "emacs-rpc-bridge-%s.sock" (user-uid))
